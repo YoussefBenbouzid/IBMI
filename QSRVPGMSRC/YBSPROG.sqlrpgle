@@ -63,7 +63,7 @@ dcl-proc YB_CancellaLibro export;
 END-PROC;
 
 //--------------------------------
-// Ottienimento libro
+// Ottenimento libro
 //--------------------------------
 dcl-proc YB_OttieniLibro export;
   dcl-pi *n ind;
