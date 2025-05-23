@@ -1,0 +1,38 @@
+     A          R WSFL                      SFL
+     A            WIDLIBRO       5   O  6  6
+     A            WAUTORE       10   O  6 14
+     A            WTITOLO       15   O  6 25
+     A            WANNO          4   O  6 41
+     A            WISBN         13   O  6 46
+     A            WDISP          2   O  6 61
+     A            WSEL           1   B  6 75
+     A          R WCTL                      SFLCTL(WSFL)
+     A  51                                  SFLDSPCTL
+     A  52                                  SFLDSP
+     A  50                                  SFLCLR
+     A  50                                  SFLDLT
+     A                                      SFLPAG(6)
+     A                                      SFLSIZ(12)
+     A                                      CA06
+     A                                      CA12
+     A                                      OVERLAY
+     A            SF1SRN         4  0H      SFLRCDNBR
+     A                                  5 14'Autore'
+     A                                  5 25'Titolo'
+     A                                  5 41'Anno'
+     A                                  5 46'ISBN'
+     A                                  5 60'Disp'
+     A                                  5  5'idLibro'
+     A                                  2 61'2 - Modifica'
+     A                                      COLOR(YLW)
+     A                                  3 46'4 - Cancella'
+     A                                      COLOR(RED)
+     A                                  2 62' '
+     A                                      COLOR(TRQ)
+     A                                  2  5'idLibro:'
+     A            PARAM         10   B  2 14
+     A                                  2 46'F6 - Aggiungi'
+     A                                  3 61'5 - Visualizza'
+     A                                      COLOR(TRQ)
+     A          R WFOOTER
+     A                                 15 61'F12 - Esci'
