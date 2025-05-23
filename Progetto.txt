@@ -1,0 +1,519 @@
+YBPROG.PF
+     A          R YBPROGR
+     A            IDLIBRO        5A
+     A            AUTORE        10A
+     A            TITOLO        15A
+     A            ANNO           4A
+     A            ISBN          13A
+     A            DISP           2A      
+
+
+
+YBRPROG.SQLRPGLE
+**free
+ctl-opt dftactgrp(*no); // Il programma gira in ILE
+dcl-f YBDPROG WORKSTN(*EXT) SFILE(WSFL:SF1SRN); // Includo display e subfile
+/COPY ELMPBEN/QCOPYSRC,YBICRUD2
+dcl-ds dsCrud LikeDs(tDsCrud);
+EXEC SQL SET OPTION COMMIT=*NONE; // Per disabilitare il commit
+
+doU *inKL = *on; // Finché non viene selezionato KL (F12)
+  PulisciWSFL();
+  CaricaWSFL(PARAM);
+  *in51 = *on; // Abilita SFLDSPCTL (controllo subfile)
+  if SF1SRN > 0; // Se ci sono record in subfile
+    *in52 = *on; // Abilita SFLDSP (visualizzazione subfile)
+    SF1SRN = 1;  // Cursore nel primo record
+  ENDIF;
+  VisualizzaWSFL();
+  if *inKF = *on;
+    clear dsCrud;
+    dsCrud.opType = 'I';
+    callP(e) YBRCRUD(dsCrud);
+  else;
+    GestisciWSFL();
+  ENDIF;
+ENDDO;
+
+*inLr = *on; // Termina il programma alla fine
+return; // Per compilare file RPG
+
+//--------------------------------
+// Pulizia subfile
+//--------------------------------
+dcl-proc PulisciWSFL;
+  *in50 = *on;  // Abilita SFLCLR e SFLDLT (cancellazione)
+  *in51 = *off; // Disabilita SFLDSPCTL (controllo subfile)
+  *in52 = *off; // Disabilita SFLDSP (visualizzazione subfile)
+  write WCTL; // Riscrive control file
+  *in50 = *off; // Disabilita la cancellazione
+  SF1SRN = 0;   // Record number da capo
+  clear WSFL; // Pulisce subfile
+END-PROC;
+
+//--------------------------------
+// Caricamento subfile
+//--------------------------------
+dcl-proc CaricaWSFL;
+  dcl-pi *n;
+    id char(5);
+  end-pi;
+
+  // Struttura dati coerente al file fisico
+  dcl-ds dsLibro qualified; // qualified abilita prefisso dsLibro
+    idLibro char(10);
+    autore char(10);
+    titolo char(15);
+    anno char(4);
+    isbn char(13);
+    disp char(2);
+  END-DS;
+
+  // Prelevo i campi dal file fisico
+  EXEC SQL
+  DECLARE C1 CURSOR FOR
+  SELECT IDLIBRO, AUTORE, TITOLO, ANNO, ISBN, DISP
+  FROM YBPROG;
+
+  EXEC SQL OPEN C1;
+  dow sqlCode = 0 and sqlCode <> 100;
+    EXEC SQL FETCH C1 INTO :dsLibro;
+    if sqlCode < 0 or sqlCode = 100;
+      leave;
+    ENDIF;
+    WIDLIBRO = dsLibro.idLibro;
+    WAUTORE = dsLibro.autore;
+    WTITOLO = dsLibro.titolo;
+    WANNO = dsLibro.anno;
+    WISBN = dsLibro.isbn;
+    WDISP = dsLibro.disp;
+    SF1SRN +=1; // Incremento il record number
+    write(e) WSFL; // Scrivo nel subfile
+  ENDDO;
+  EXEC SQL CLOSE C1;
+END-PROC;
+
+//--------------------------------
+// Visualizzazione subfile
+//--------------------------------
+dcl-proc VisualizzaWSFL;
+  write WFOOTER; // Aggiunge il footer, usando OVERLAY
+  exfmt WCTL; // Visualizza subfile e accetta input nel control file
+END-PROC;
+
+//--------------------------------
+// Gestione subfile
+//--------------------------------
+dcl-proc GestisciWSFL;
+  dcl-s i zoned(4:0);
+  // dcl-ds dsCrud likeDs(tDsCrud);
+  for i = 1 to 9999;
+    chain i WSFL;
+    if not %found;
+      leave;
+    ENDIF;
+    select;
+      when WSEL = '2';
+        clear dsCrud;
+        dsCrud.opType = 'U';
+        dsCrud.id = WIDLIBRO;
+        callP(e) YBRCRUD(dsCrud);
+      when WSEL = '4';
+        clear dsCrud;
+        dsCrud.opType = 'D';
+        dsCrud.id = WIDLIBRO;
+        callP(e) YBRCRUD(dsCrud);
+      when WSEL = '5';
+        clear dsCrud;
+        dsCrud.opType = 'V';
+        dsCrud.id = WIDLIBRO;
+        callP(e) YBRCRUD(dsCrud);
+    ENDSL;
+  ENDFOR;
+END-PROC;
+
+
+
+YBRCRUD.SQLRPGLE
+**free
+//------------------------------
+//     Specifiche iniziali
+//------------------------------
+ctl-opt dftactgrp(*no) bnddir('YBBPROG');
+dcl-f YBDCRUD WORKSTN(*EXT);
+
+dcl-ds dsLibro qualified; // qualified abilita prefisso dsLibro
+  idLibro char(5);
+  autore char(10);
+  titolo char(15);
+  anno char(4);
+  isbn char(13);
+  disp char(2);
+END-DS;
+
+/COPY QCOPYSRC,YBICRUD2
+/COPY QCOPYSRC,YBICRUD1
+
+dcl-pi YBRCRUD;
+  dsEntry likeDs(tDsCrud); // Passo la struttura come parametro
+END-PI;
+
+EXEC SQL SET OPTION COMMIT=*NONE; // Per disabilitare il commit
+
+select;
+  when dsEntry.opType = 'U';
+    *in21 = *on;
+    *in23 = *on;
+    *in24 = *on;
+    *in25 = *off;
+    WIDLIBRO = dsEntry.id;
+    VisualizzaLibro(WIDLIBRO);
+  when dsEntry.opType = 'V';
+    *in21 = *on;
+    *in26 = *on;
+    *in23 = *on;
+    *in24 = *on;
+    *in25 = *on;
+    WIDLIBRO = dsEntry.id;
+    VisualizzaLibro(WIDLIBRO);
+  when dsEntry.opType = 'D';
+    *in21 = *on;
+    *in26 = *on;
+    *in23 = *on;
+    *in24 = *off;
+    *in25 = *on;
+    WIDLIBRO = dsEntry.id;
+    VisualizzaLibro(WIDLIBRO);
+ENDSL;
+
+doU *inKL = *on;
+  exfmt WIN1;
+  SELECT;
+  when *inKF = *on;
+    PopulateLibroDs(WIDLIBRO:WAUTORE:WTITOLO:WANNO:WISBN:WDISP);
+    AggiungiLibro(dsLibro);
+  when *inKB = *on;
+    PopulateLibroDs(WIDLIBRO:WAUTORE:WTITOLO:WANNO:WISBN:WDISP);
+    ModificaLibro(dsLibro);
+  when *inKQ = *on;
+    doU *inKI = *on or *inKQ = *on;
+      exfmt WIN2;
+      if *inKQ = *on;
+        CancellaLibro(WIDLIBRO);
+      ENDIF;
+    enddo;
+  other;
+    if WIDLIBRO <> '';
+      VisualizzaLibro(WIDLIBRO);
+    ENDIF;
+  ENDSL;
+ENDDO;
+
+*inLR = *on;
+return;
+
+//--------------------------------
+// Costruttore
+//--------------------------------
+DCL-PROC PopulateLibroDs;
+  dcl-pi *n;
+    idLibro char(5);
+    autore char(10);
+    titolo char(15);
+    anno char(4);
+    isbn char(13);
+    disp char(2);
+  END-PI;
+  clear dsLibro;
+  dsLibro.idLibro = idLibro;
+  dsLibro.autore = autore;
+  dsLibro.titolo = titolo;
+  dsLibro.anno = anno;
+  dsLibro.isbn = isbn;
+  dsLibro.disp = disp;
+END-PROC;
+
+//--------------------------------
+// Pulizia campi libro
+//--------------------------------
+dcl-proc PulisciCampi;
+  WAUTORE = '';
+  WTITOLO = '';
+  WANNO = '';
+  WISBN = '';
+  WDISP = '';
+END-PROC;
+
+//--------------------------------
+// Aggiunta libro
+//--------------------------------
+DCL-PROC AggiungiLibro;
+  dcl-pi *n ind;
+    nuovoLibro LikeDs(dsLibro);
+  END-PI;
+  if YB_AggiungiLibro(nuovoLibro);
+    PulisciCampi();
+    return *on;
+  else;
+    return *off;
+  ENDIF;
+END-PROC;
+
+//--------------------------------
+// Modifica libro
+//--------------------------------
+dcl-proc ModificaLibro;
+  dcl-pi *n ind;
+    libroModificato LikeDs(dsLibro);
+  END-PI;
+  if YB_ModificaLibro(libroModificato);
+    PulisciCampi();
+    return *on;
+  else;
+    return *off;
+  ENDIF;
+END-PROC;
+
+//--------------------------------
+// Cancellazione libro
+//--------------------------------
+dcl-proc CancellaLibro;
+  dcl-pi *n ind;
+    id char(5);
+  END-PI;
+  if YB_CancellaLibro(id);
+    // PulisciCampi();
+    return *on;
+  else;
+    return *off;
+  ENDIF;
+END-PROC;
+
+//--------------------------------
+// Visualizzazione libro
+//--------------------------------
+dcl-proc VisualizzaLibro;
+  dcl-pi *n;
+    id_inp char(5);
+  END-PI;
+  // PulisciCampi();
+  YB_OttieniLibro(id_inp:dsLibro);
+  if *on;
+    WIDLIBRO = dsLibro.idLibro;
+    WAUTORE = dsLibro.autore;
+    WTITOLO = dsLibro.titolo;
+    WANNO = dsLibro.anno;
+    WISBN = dsLibro.isbn;
+    WDISP = dsLibro.disp;
+  ENDIF;
+END-PROC;
+
+
+
+YBDPROG.dspf
+     A          R WSFL                      SFL
+     A            WIDLIBRO       5   O  6  6
+     A            WAUTORE       10   O  6 14
+     A            WTITOLO       15   O  6 25
+     A            WANNO          4   O  6 41
+     A            WISBN         13   O  6 46
+     A            WDISP          2   O  6 61
+     A            WSEL           1   B  6 75
+     A          R WCTL                      SFLCTL(WSFL)
+     A  51                                  SFLDSPCTL
+     A  52                                  SFLDSP
+     A  50                                  SFLCLR
+     A  50                                  SFLDLT
+     A                                      SFLPAG(6)
+     A                                      SFLSIZ(12)
+     A                                      CA06
+     A                                      CA12
+     A                                      OVERLAY
+     A            SF1SRN         4  0H      SFLRCDNBR
+     A                                  5 14'Autore'
+     A                                  5 25'Titolo'
+     A                                  5 41'Anno'
+     A                                  5 46'ISBN'
+     A                                  5 60'Disp'
+     A                                  5  5'idLibro'
+     A                                  2 61'2 - Modifica'
+     A                                      COLOR(YLW)
+     A                                  3 46'4 - Cancella'
+     A                                      COLOR(RED)
+     A                                  2 62' '
+     A                                      COLOR(TRQ)
+     A                                  2  5'idLibro:'
+     A            PARAM         10   B  2 14
+     A                                  2 46'F6 - Aggiungi'
+     A                                  3 61'5 - Visualizza'
+     A                                      COLOR(TRQ)
+     A          R WFOOTER
+     A                                 15 61'F12 - Esci'
+
+
+
+YBDCRUD.dspf
+     A          R WIN1                      CA12
+     A N23                                  CF06
+     A N25                                  CF02
+     A N24                                  CF16
+     A                                  2 11'Gestione libro'
+     A                                      TEXT('title')
+     A                                  5 11'idLibro:'
+     A                                  6 11'Autore:'
+     A                                  7 11'Titolo:'
+     A                                  8 11'Anno:'
+     A                                  9 11'ISBN:'
+     A                                 10 11'Disp:'
+     A            WIDLIBRO       5   B  5 21
+     A  21                                  DSPATR(PR)
+     A            WAUTORE       10   B  6 21
+     A  26                                  DSPATR(PR)
+     A            WTITOLO       15   B  7 21
+     A  26                                  DSPATR(PR)
+     A            WANNO          4   B  8 21
+     A  26                                  DSPATR(PR)
+     A            WISBN         13   B  9 21
+     A  26                                  DSPATR(PR)
+     A            WDISP          2   B 10 21
+     A  26                                  DSPATR(PR)
+     A                                 14 30'F6 - Aggiungi libro'
+     A  23                                  DSPATR(ND)
+     A                                  2 41'F12 - Esci'
+     A                                 14  8'F2 - Modifica libro'
+     A  25                                  DSPATR(ND)
+     A                                 14 51'F16 - Cancella libro'
+     A  24                                  DSPATR(ND)
+     A          R WIN2                      CF16
+     A                                      CA09
+     A                                 13 37'Confermi?'
+     A                                 15 37'F16 - Conferma'
+     A                                 16 37'F9 - Esci' 
+
+
+
+YBSPROG.sqlrpgle
+**free
+Ctl-Opt nomain;
+/COPY QCOPYSRC,YBICRUD1
+EXEC SQL SET OPTION COMMIT = *none;
+
+//--------------------------------
+// Aggiunta libro
+//--------------------------------
+dcl-proc YB_AggiungiLibro export; // Per esportare la procedura
+  dcl-pi *n ind;
+    nuovoLibro LikeDs(tDsLibro);
+  END-PI;
+  EXEC SQL
+  INSERT INTO YBPROG(IDLIBRO, AUTORE, TITOLO, ANNO, ISBN, DISP)
+  VALUES (:nuovoLibro.idLibro,:nuovoLibro.autore,:nuovoLibro.titolo,
+  :nuovoLibro.anno,:nuovoLibro.isbn,:nuovoLibro.disp);
+  if sqlCode < 0;
+    return *off;
+  else;
+    return *on;
+  ENDIF;
+END-PROC;
+
+//--------------------------------
+// Modifica libro
+//--------------------------------
+dcl-proc YB_ModificaLibro export;
+  dcl-pi *n ind;
+    libroModificato LikeDs(tDsLibro);
+  END-PI;
+  EXEC SQL
+  UPDATE YBPROG
+  SET
+    AUTORE = :libroModificato.autore,
+    TITOLO = :libroModificato.titolo,
+    ANNO = :libroModificato.anno,
+    ISBN = :libroModificato.isbn,
+    DISP = :libroModificato.disp
+  WHERE
+    IDLIBRO = :libroModificato.idLibro;
+  if sqlCode < 0 or sqlCode = 100;
+    return *off;
+  else;
+    return *on;
+  ENDIF;
+END-PROC;
+
+//--------------------------------
+// Cancellazione libro
+//--------------------------------
+dcl-proc YB_CancellaLibro export;
+  dcl-pi *n ind;
+    libroId char(5);
+  END-PI;
+  EXEC SQL
+  DELETE FROM YBPROG
+  WHERE IDLIBRO = :libroId;
+  if sqlCode < 0 or sqlCode = 100;
+    return *off;
+  else;
+    return *on;
+  ENDIF;
+END-PROC;
+
+//--------------------------------
+// Ottienimento libro
+//--------------------------------
+dcl-proc YB_OttieniLibro export;
+  dcl-pi *n ind;
+    libroId char(5);
+    libroOttenuto LikeDs(tDsLibro);
+  END-PI;
+  clear libroOttenuto;
+  EXEC SQL
+  SELECT IDLIBRO, AUTORE, TITOLO, ANNO, ISBN, DISP
+  INTO :libroOttenuto
+  FROM YBPROG
+  WHERE IDLIBRO = :libroId;
+  if sqlCode < 0 or sqlCode = 100;
+    return *off;
+  endif;
+  return *on;
+END-PROC;
+
+
+
+YBICRUD1.sqlrpgle
+       dcl-ds tDsLibro qualified template;
+         idLibro char(5);
+         autore char(10);
+         titolo char(15);
+         anno char(4);
+         isbn char(13);
+         disp char(2);
+       END-DS;
+
+       dcl-pr YB_AggiungiLibro ind;
+         *n LikeDs(tDsLibro);
+       END-PR;
+
+       dcl-pr YB_ModificaLibro ind;
+         *n LikeDs(tDsLibro);
+       END-PR;
+
+       dcl-pr YB_CancellaLibro ind;
+         *n char(5);
+       END-PR;
+
+       dcl-pr YB_OttieniLibro ind;
+          *n char(5);
+          *n LikeDs(tDsLibro);
+       END-PR;    
+
+
+
+YBICRUD2.sqlrpgle
+       dcl-ds tDsCrud qualified template;
+         opType char(1);
+         id char(5);
+       end-ds;
+
+       dcl-pr YBRCRUD extpgm('YBRCRUD');
+         *n LikeDs(tDsCrud);
+       end-pr;  
