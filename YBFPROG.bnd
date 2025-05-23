@@ -1,0 +1,6 @@
+             STRPGMEXP  PGMLVL(*CURRENT) SIGNATURE('YBSPROG.001')
+                EXPORT     SYMBOL('YB_AGGIUNGILIBRO')
+                EXPORT     SYMBOL('YB_MODIFICALIBRO')
+                EXPORT     SYMBOL('YB_CANCELLALIBRO')
+                EXPORT     SYMBOL('YB_OTTIENILIBRO')
+             ENDPGMEXP                    
